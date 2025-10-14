@@ -1,3 +1,3 @@
-from .CULane import download_culane, load_culane
+from .culane import CULaneDataset
 
-__all__ = ["download_culane", "load_culane"]
+__all__ = ["CULaneDataset"]

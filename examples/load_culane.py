@@ -3,14 +3,21 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lane_detection.datasets import download_culane, load_culane
+from lane_detection.datasets import CULaneDataset
 
 
 def main():
-    # Download and load CULane dataset
-    data_dir = Path(__file__).parents[1] / "data/CULane"
-    download_culane(data_dir)
-    images, labels, _ = load_culane(data_dir, n_samples=9)
+    # Download and load the CULane dataset
+    path = Path(__file__).parents[1] / "data/CULane"
+    dataset = CULaneDataset(path)
+    dataset.download()
+    n_samples = 1000
+    images, labels = dataset.load(n_samples=n_samples, use_mmap=True)
+
+    # Extract subset of 9 images
+    idxs = np.random.choice(n_samples, size=9, replace=False)
+    images = images[idxs]
+    labels = labels[idxs]
 
     # Visualize images with labels overlayed on top
     _, axes = plt.subplots(3, 3, figsize=(15, 10))
