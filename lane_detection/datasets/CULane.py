@@ -1,5 +1,7 @@
 import os
+import json
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
@@ -43,7 +45,7 @@ def save_culane(raw_dir: Path, data_dir: Path) -> None:
         raw_dir: Path to raw CULane dataset.
         data_dir: Path to directory for storing extracted dataset.
     """
-    if (data_dir / "images.npy").exists() and (data_dir / "labels.npy").exists():
+    if exists_culane(data_dir):
         return
     
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -91,37 +93,70 @@ def save_culane(raw_dir: Path, data_dir: Path) -> None:
     np.save(data_dir / "labels.npy", labels)
     del labels
 
+    # Store dataset's metadata
+    metadata = {
+        "size": n_videos * n_imgs_per_video,
+        "n_videos": n_videos,
+        "n_imgs_per_video": n_imgs_per_video,
+        "img_shape": (height, width, 3),
+        "lbl_shape": (height, width),
+    }
+    with open(data_dir / "metadata.json", "w") as metafile: 
+        json.dump(metadata, metafile, indent=4)
 
-def load_culane(data_dir: Path, n_samples: int = -1) -> tuple[NDArray[np.uint8], NDArray[np.uint8]]:
-    """Load both raw images and labels from the stored CULane dataset. The dataset is not loaded
-    fully into RAM. Instead, the mmap_mode flag is used to keep it on disk and load data slices
-    as needed.
+
+def exists_culane(data_dir: Path) -> bool:
+    """Checks whether the dataset already exists or not.
     
     Args:
         data_dir: Path to directory where the dataset was stored.
-        n_samples: Number of samples to load. If negative, then all dataset is loaded. 
+    
+    Returns:
+        True if the dataset already exists and False otherwise.
+    """
+    images_path = data_dir / "images.npy"
+    labels_path = data_dir / "labels.npy"
+    meta_path = data_dir / "metadata.json"
+    return all([f.exists() for f in [images_path, labels_path, meta_path]])
+
+
+def load_culane(
+    data_dir: Path,
+    n_samples: int = -1,
+    use_mmap: bool = True,
+) -> tuple[NDArray[np.uint8], NDArray[np.uint8], dict[str, Any]]:
+    """Load both raw images and labels from the stored CULane dataset.
+    
+    Args:
+        data_dir: Path to directory where the dataset was stored.
+        n_samples: Number of samples to load. If negative, then all dataset is loaded.
+        use_mmap: Keep dataset on disk and load slices dynamically in RAM as needed.
     
     Returns:
         tuple
         - images: (N, H, W, 3) array containing all images in the dataset.
         - labels: (N, H, W) array containing all labels in the dataset.
+        - metadata: Dict containing the dataset's metadata.
     """
     assert data_dir.exists()
     assert data_dir.is_dir()
     
     images_path = data_dir / "images.npy"
     labels_path = data_dir / "labels.npy"
-    assert images_path.exists() and labels_path.exists()
+    metadata_path = data_dir / "metadata.json"
+    assert exists_culane(data_dir), f"Dataset does not exist at {data_dir}."
 
-    # Load dataset from .npz files
-    images = np.load(images_path, mmap_mode="r")
-    labels = np.load(labels_path, mmap_mode="r")
+    # Load dataset
+    mmap_mode = "r" if use_mmap else None
+    images = np.load(images_path, mmap_mode=mmap_mode)
+    labels = np.load(labels_path, mmap_mode=mmap_mode)
+    with open(metadata_path, "r") as metafile:
+        metadata = json.load(metafile)
     
     # Determine the number of samples
-    n_samples_total = images.shape[0]
-    n_samples = n_samples_total if n_samples < 0 else n_samples
-    n_samples = n_samples_total if n_samples > n_samples_total else n_samples
-    return images[:n_samples], labels[:n_samples]
+    n_samples = metadata["size"] if n_samples < 0 else n_samples
+    n_samples = metadata["size"] if n_samples > metadata["size"] else n_samples
+    return images[:n_samples], labels[:n_samples], metadata
 
 
 def main(data_dir: str):

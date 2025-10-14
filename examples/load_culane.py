@@ -10,7 +10,7 @@ def main():
     # Download and load CULane dataset
     data_dir = Path(__file__).parents[1] / "data/CULane"
     download_culane(data_dir)
-    images, labels = load_culane(data_dir, n_samples=9)
+    images, labels, _ = load_culane(data_dir, n_samples=9)
 
     # Visualize images with labels overlayed on top
     _, axes = plt.subplots(3, 3, figsize=(15, 10))
