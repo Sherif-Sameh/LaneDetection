@@ -24,22 +24,25 @@ class LaneDataset(ABC):
         assert np.isclose(sum(self.split), 1.0).item(), "Dataset split must sum to 1.0"
     
     @abstractmethod
+    def __len__(self) -> int:
+        """Return the number of samples available in the loaded dataset."""
+    
+    @abstractmethod
+    def __getitem__(self, idx: int | slice | tuple[int | slice, ...]) -> tuple[NDArray, ...]:
+        """Retrieve data sample/s from the dataset and return them."""
+
+    @abstractmethod
     def download(self) -> None:
         """Download and store the dataset if not already stored."""
     
     @abstractmethod
-    def load(self, val: bool = False, test: bool = False) -> tuple[NDArray, NDArray]:
-        """Load the stored dataset and return its data and labels.
+    def load(self, val: bool = False, test: bool = False) -> None:
+        """Load the stored dataset to prepare for data reading.
         
         Args:
             val: Load the data allocated for validation instead of training.
             test: Load the data allocated for testing instead of training. If both val and test
                 flags are set, then validation takes higher precedence over testing.
-        
-        Returns:
-            tuple
-            - data: array containing all raw data in the dataset.
-            - labels: array containing all labels in the dataset.
         """
     
     @abstractmethod

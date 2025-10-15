@@ -40,19 +40,17 @@ def main():
     dataset.download()
     
     # Extract subset of 9 images from training dataset
-    images, labels = dataset.load(use_mmap=True)
-    idxs = np.random.choice(images.shape[0], size=9, replace=False)
-    images = images[idxs]
-    labels = labels[idxs]
+    dataset.load(use_mmap=True)
+    idxs = np.random.choice(len(dataset), size=9, replace=False)
+    images, labels = dataset[idxs]
 
     # Visualize images with labels overlayed on top
     visualize_lanes(images, labels)
 
     # Extract subset of 9 images from test dataset
-    images, labels = dataset.load(test=True, use_mmap=True)
-    idxs = np.random.choice(images.shape[0], size=9, replace=False)
-    images = images[idxs]
-    labels = labels[idxs]
+    dataset.load(test=True, use_mmap=True)
+    idxs = np.random.choice(len(dataset), size=9, replace=False)
+    images, labels = dataset[idxs]
 
     # Visualize images with labels overlayed on top
     visualize_lanes(images, labels)

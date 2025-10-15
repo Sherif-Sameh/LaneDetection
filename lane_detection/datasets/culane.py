@@ -37,7 +37,18 @@ class CULaneDataset(LaneDataset):
         self.height = height
         self.width = width
         self.files = ("images.npy", "labels.npy", "metadata.json")
+
+        self.images = np.zeros((0, self.height, self.width, 3), dtype=np.uint8)
+        self.labels = np.zeros((0, self.height, self.width), dtype=np.uint8)
     
+    def __len__(self) -> int:
+        """Return the number of samples available in the loaded dataset."""
+        return self.images.shape[0]
+    
+    def __getitem__(self, idx: int | slice | tuple[int | slice, ...]) -> tuple[NDArray, NDArray]:
+        """Retrieve data sample/s from the dataset and return them."""
+        return self.images[idx], self.labels[idx]
+
     def download(self) -> None:
         """Download the CULane dataset with segmentation-based annotations.
     
@@ -65,24 +76,14 @@ class CULaneDataset(LaneDataset):
         # Convert dataset to NumPy arrays and store it into desired directory
         self._convert(download_path)
     
-    def load(
-        self,
-        val: bool = False,
-        test: bool = False,
-        use_mmap: bool = True,
-    ) -> tuple[NDArray[np.uint8], NDArray[np.uint8]]:
-        """Load the stored dataset and return its data and labels.
+    def load(self, val: bool = False, test: bool = False, use_mmap: bool = True) -> None:
+        """Load the stored dataset to prepare for data reading.
         
         Args:
             val: Load the data allocated for validation instead of training.
             test: Load the data allocated for testing instead of training. If both val and test
                 flags are set, then validation takes higher precedence over testing.
             use_mmap: Keep dataset on disk and load slices dynamically in RAM as needed.
-        
-        Returns:
-            tuple
-            - data: (N, H, W, 3) array containing raw data in the dataset.
-            - labels: (N, H, W) array containing labels in the dataset.
         """
         assert self.exists(), f"Dataset does not exist at {self.paths[0].parent}."
         path = self.paths[2] if test else self.paths[0]
@@ -90,11 +91,10 @@ class CULaneDataset(LaneDataset):
 
         # Load dataset
         mmap_mode = "r" if use_mmap else None
-        images = np.load(path / self.files[0], mmap_mode=mmap_mode)
-        labels = np.load(path / self.files[1], mmap_mode=mmap_mode)
+        self.images = np.load(path / self.files[0], mmap_mode=mmap_mode)
+        self.labels = np.load(path / self.files[1], mmap_mode=mmap_mode)
         with open(path / self.files[2], "r") as metafile:
             self.metadata = json.load(metafile)
-        return images, labels
     
     def exists(self) -> bool:
         """Check whether the dataset already exists at its specified path or not.
@@ -177,7 +177,7 @@ class CULaneDataset(LaneDataset):
             del labels_split
         del labels
         (self.paths[0].parent / self.files[1]).unlink()
-        
+
         # Store dataset's metadata
         for p, idxs in zip(self.paths, split_idxs):
             metadata = {
