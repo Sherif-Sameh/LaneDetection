@@ -1,0 +1,60 @@
+from pathlib import Path
+
+import numpy as np
+import matplotlib.pyplot as plt
+from numpy.typing import NDArray
+
+from lane_detection.datasets import CULaneDataset
+
+
+def visualize_lanes(images: NDArray, labels: NDArray) -> None:
+    assert len(images) == 9
+    assert len(labels) == 9
+    
+    # Visualize images with labels overlayed on top
+    _, axes = plt.subplots(3, 3, figsize=(15, 10))
+    axes = axes.flatten()
+    label_colors = {
+        1: np.array([255, 0, 0]),
+        3: np.array([0, 0, 255]),
+        2: np.array([0, 255, 0]),
+        4: np.array([0, 128, 128]),
+    }
+    for i, (ax, img, lbl) in enumerate(zip(axes, images, labels)):
+        ax.imshow(img)
+        ax.set_title(f"Image {i + 1}")
+        label_img = np.copy(img)
+        for j in label_colors.keys():
+            lane_mask = lbl == j
+            label_img[lane_mask] = label_colors[j]
+        ax.imshow(label_img, alpha=0.6)
+    
+    plt.tight_layout()
+    plt.show()
+
+
+def main():
+    # Download and load the CULane dataset
+    path = Path(__file__).parents[2] / "data/CULane"
+    dataset = CULaneDataset(path, val=0.0, test=0.1)
+    dataset.download()
+    
+    # Extract subset of 9 images from training dataset
+    dataset.load(use_mmap=True)
+    idxs = np.random.choice(len(dataset), size=9, replace=False)
+    images, labels = dataset[idxs]
+
+    # Visualize images with labels overlayed on top
+    visualize_lanes(images, labels)
+
+    # Extract subset of 9 images from test dataset
+    dataset.load(test=True, use_mmap=True)
+    idxs = np.random.choice(len(dataset), size=9, replace=False)
+    images, labels = dataset[idxs]
+
+    # Visualize images with labels overlayed on top
+    visualize_lanes(images, labels)
+
+
+if __name__ == "__main__":
+    main()

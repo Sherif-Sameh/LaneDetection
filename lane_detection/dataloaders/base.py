@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 from typing import Self
 
@@ -30,6 +31,9 @@ class LaneDataloader(ABC):
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.seed = seed
+    
+    def __len__(self) -> int:
+        return math.ceil(len(self.dataset) / self.batch_size)
         
     def __iter__(self) -> Self:
         return self

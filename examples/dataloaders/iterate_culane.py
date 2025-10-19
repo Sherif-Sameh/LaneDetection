@@ -25,11 +25,11 @@ def visualize_lanes(images: NDArray, labels: NDArray) -> None:
     for i, (ax, img, lbl) in enumerate(zip(axes, images, labels)):
         ax.imshow(img)
         ax.set_title(f"Image {i + 1}")
+        label_img = np.copy(img)
         for j in label_colors.keys():
-            label_img = np.copy(img)
             lane_mask = lbl == j
             label_img[lane_mask] = label_colors[j]
-            ax.imshow(label_img, alpha=0.8)
+        ax.imshow(label_img, alpha=0.6)
     
     plt.tight_layout()
     plt.show()
@@ -37,7 +37,7 @@ def visualize_lanes(images: NDArray, labels: NDArray) -> None:
 
 def main():
     # Download and load the CULane dataset
-    path = Path(__file__).parents[1] / "data/CULane"
+    path = Path(__file__).parents[2] / "data/CULane"
     dataset = CULaneDataset(path, val=0.0, test=0.1)
     dataset.download()
     dataset.load(use_mmap=True)
