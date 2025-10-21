@@ -1,0 +1,26 @@
+# Configuration for the classical computer vision-based lane detector
+
+# Adaptive thresholding parameters
+binary_thresh = 180
+equalize_hist = false
+roi = [
+    [0, 130],
+    [0, 330],
+    [640, 330],
+    [640, 130],
+]
+
+# Canny edge detector parameters
+canny_min_thresh = 130
+canny_max_thresh = 220
+
+# Probabilistic Hough line transform parameters
+hough_rho_res = 1
+hough_theta_res = 0.017453293  # pi / 180
+hough_min_thresh = 10
+hough_min_len = 20
+hough_max_gap = 30
+
+# Other parameters
+angle_thresh = 1.047  # pi / 3
+store_intermed = true
