@@ -126,7 +126,8 @@ class VGG(nnx.Module, ABC):
             f"Expected image shape {self.in_shape}, got{x.shape[1:]}"
         for layer in self.features.values():
             x = layer(x)
-        x = x.reshape(x.shape[0], -1)
+        # Convert to PyTorch (B, C, H, W) for compatibility with pre-trained FC layers
+        x = x.transpose(0, 3, 1, 2).reshape(x.shape[0], -1)
         for layer in self.classifier.values():
             x = layer(x)
         return x 
