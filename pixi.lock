@@ -705,7 +705,7 @@ packages:
 - pypi: ./
   name: lane-detection
   version: 0.0.1
-  sha256: ab0e546b82810acaa3d8a7013390a9aaffd10f3a06778e0d867841d4f18298e0
+  sha256: b774281010878da8c5900f41549bc8f13ae6bb98fa1a1debc6507219684faf6e
   requires_dist:
   - numpy>=1.26.4
   - opencv-python
@@ -717,6 +717,7 @@ packages:
   - wandb
   - kagglehub
   - toml
+  - pillow
   requires_python: '>=3.10,<3.13'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/ld_impl_linux-64-2.44-ha97dd6f_2.conda

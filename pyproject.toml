@@ -14,6 +14,7 @@ dependencies = [
     "wandb",
     "kagglehub",
     "toml",
+    "pillow",
 ]
 
 [tool.pixi.workspace]
