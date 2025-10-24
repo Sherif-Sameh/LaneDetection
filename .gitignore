@@ -419,3 +419,7 @@ FodyWeavers.xsd
 
 *.egg-info
 data/*
+
+# PyTorch models
+*.pth
+*.pt
