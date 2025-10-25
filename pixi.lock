@@ -81,6 +81,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/2c/8b/90eb44a40476fa0e71e05a0283947cfd74a5d36121a11d926ad6f3193cc4/opencv_python-4.11.0.86-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b8/ec/19c6cc6064c7fc8f0cd6d5b37c4747849e66040c6ca98f86565efc2c227c/optax-0.2.6-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/c7/78/0e144f12703c95d4495e9abc390c2f548ee9f24d2e487137108a921b1d81/orbax-0.1.9.tar.gz
       - pypi: https://files.pythonhosted.org/packages/1b/96/510dff16d2b75d9debb77fcfc4e6a4749059024a290953032f3ac793f74a/orbax_checkpoint-0.11.25-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e4/c9/06dd4a38974e24f932ff5f98ea3c546ce3f8c995d3f0985f8e5ba48bba19/pillow-11.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
@@ -705,7 +706,7 @@ packages:
 - pypi: ./
   name: lane-detection
   version: 0.0.1
-  sha256: b774281010878da8c5900f41549bc8f13ae6bb98fa1a1debc6507219684faf6e
+  sha256: a15e1837bab6675371804fbfd554305f6dd21cb9d6e1cc2abccc8dde970e9cff
   requires_dist:
   - numpy>=1.26.4
   - opencv-python
@@ -713,6 +714,7 @@ packages:
   - jax[cuda]>=0.5
   - flax
   - optax
+  - orbax
   - fire>=0.6.0
   - wandb
   - kagglehub
@@ -1138,6 +1140,12 @@ packages:
   - scipy>=1.7.1 ; extra == 'test'
   - scikit-learn ; extra == 'test'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/c7/78/0e144f12703c95d4495e9abc390c2f548ee9f24d2e487137108a921b1d81/orbax-0.1.9.tar.gz
+  name: orbax
+  version: 0.1.9
+  sha256: 42dd487ceef9fbf027f4720f3d041686af75120466a528a8a8141226bc197218
+  requires_dist:
+  - orbax-checkpoint>=0.1.8
 - pypi: https://files.pythonhosted.org/packages/1b/96/510dff16d2b75d9debb77fcfc4e6a4749059024a290953032f3ac793f74a/orbax_checkpoint-0.11.25-py3-none-any.whl
   name: orbax-checkpoint
   version: 0.11.25

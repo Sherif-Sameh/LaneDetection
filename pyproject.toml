@@ -10,6 +10,7 @@ dependencies = [
     "jax[cuda] >= 0.5",
     "flax",
     "optax",
+    "orbax",
     "fire >= 0.6.0",
     "wandb",
     "kagglehub",
