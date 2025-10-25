@@ -28,7 +28,7 @@ def visualize_detections(
     axes[2].set_title("Edge Image")
     
     lane_image = np.copy(image)
-    lane_mask = lane[..., 0] != 0
+    lane_mask = lane != 0
     lane_image[lane_mask] = label_color
     axes[3].imshow(image[0])
     axes[3].imshow(lane_image[0], alpha=0.6)

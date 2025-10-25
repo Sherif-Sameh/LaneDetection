@@ -20,6 +20,6 @@ class LaneDetector(ABC):
             images: (N, H, W, C) batch of input images.
         
         Returns:
-            (N, H, W, 1) batch of lane images, where each pixel is labeled as either background (0)
+            (N, H, W) batch of lane images, where each pixel is labeled as either background (0)
             or belonging to a lane (>0).
         """

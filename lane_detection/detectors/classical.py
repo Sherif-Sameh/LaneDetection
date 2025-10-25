@@ -85,8 +85,8 @@ class ClassicalLaneDetector(LaneDetector):
         
         Returns:
             tuple
-            - binary: (N, H, W, 1) batch of binary image outputs from last batch of input image.
-            - edge: (N, H, W, 1) batch of edge image outputs from last batch of input image.
+            - binary: (N, H, W) batch of binary image outputs from last batch of input image.
+            - edge: (N, H, W) batch of edge image outputs from last batch of input image.
         """
         return self.binary, self.edge
     
@@ -100,22 +100,22 @@ class ClassicalLaneDetector(LaneDetector):
             images: (N, H, W, C) batch of input images.
         
         Returns:
-            (N, H, W, 1) batch of lane images, where each pixel is labeled as either background (0)
+            (N, H, W) batch of lane images, where each pixel is labeled as either background (0)
             or belonging to a lane (>0).
         """
         assert images.ndim == 4, \
             f"Expected a 4-dimensional input, received {images.ndim} dimensions."
-        out_shape = images.shape[:-1] + (1,)
+        out_shape = images.shape[:-1]
         binary = np.zeros(out_shape, dtype=np.uint8)
         edge = np.zeros(out_shape, dtype=np.uint8)
         out = np.zeros(out_shape, dtype=np.uint8)
 
         for i, image in enumerate(images):
-            binary[i, :, :] = self._threshold_image(image)
-            edge[i, :, :, 0] = self.canny_fn(binary[i, :, :, 0])
-            lines = self.hough_tf_fn(edge[i, :, :, 0])
+            binary[i] = self._threshold_image(image)
+            edge[i] = self.canny_fn(binary[i])
+            lines = self.hough_tf_fn(edge[i])
             lines = self._filter_lines(lines)
-            out[i, :, :] = self._get_lane_image(out_shape[1], out_shape[2], lines)
+            out[i] = self._get_lane_image(out_shape[1], out_shape[2], lines)
         
         if self.store_intermed:
             self.binary = binary
@@ -146,7 +146,7 @@ class ClassicalLaneDetector(LaneDetector):
             mask = np.zeros_like(out)
             cv2.fillPoly(mask, [self.roi], color=255)
             out = cv2.bitwise_and(out, mask)
-        return np.expand_dims(out, axis=-1)
+        return out
 
     def _filter_lines(self, lines: NDArray[np.int32] | None) -> NDArray | None:
         """Filter detected lines according to their angles with respect the vertical axis.
@@ -180,9 +180,9 @@ class ClassicalLaneDetector(LaneDetector):
             lines: (M, 1, 4) output lines from probabilistic Hough line transform.
 
         Returns:
-            (H, W, 1) grayscale image where lanes are labeled with an intensity of 1. 
+            (H, W) grayscale image where lanes are labeled with an intensity of 1. 
         """
-        out = np.zeros((height, width, 1), dtype=np.uint8)
+        out = np.zeros((height, width), dtype=np.uint8)
         if lines is None:
             return out
         
