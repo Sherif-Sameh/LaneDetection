@@ -38,15 +38,15 @@ class VGGBlock(nnx.Module):
         rngs: nnx.Rngs,
     ):
         self.in_features = in_features
-        layers = {}
-        for i in range(n_convs):
-            layers[f"conv{i+1}"] = nnx.Conv(in_features, out_features, kernel_size=(3, 3), rngs=rngs)
+        layers = []
+        for _ in range(n_convs):
+            layers.append(nnx.Conv(in_features, out_features, kernel_size=(3, 3), rngs=rngs))
             if batch_norm:
-                layers[f"bn{i+1}"] = nnx.BatchNorm(out_features, rngs=rngs)
-            layers[f"act{i+1}"] = nnx.relu
+                layers.append(nnx.BatchNorm(out_features, rngs=rngs))
+            layers.append(nnx.relu)
             in_features = out_features
-        layers["pool"] = partial(nnx.max_pool, window_shape=(2, 2), strides=(2, 2))
-        self.layers = nnx.Dict(layers)
+        layers.append(partial(nnx.max_pool, window_shape=(2, 2), strides=(2, 2)))
+        self.layers = nnx.List(layers)
     
     def __call__(self, x: Array) -> Array:
         """Forward propagate input through conv block.
@@ -60,7 +60,7 @@ class VGGBlock(nnx.Module):
         assert x.ndim == 4, f"Expected batched 4-dim inputs, got {x.ndim}-dim."
         assert x.shape[3] == self.in_features, \
             f"Expected {self.in_features} features, got {x.shape[3]}"
-        for layer in self.layers.values():
+        for layer in self.layers:
             x = layer(x)
         return x
 
@@ -97,15 +97,15 @@ class VGG(nnx.Module, ABC):
         self.features = self._make_feature_extractor(rngs=rngs)
 
         # Define architecture of FC classfier
-        self.classifier = nnx.Dict({
-            "fc1": nnx.Linear(7 * 7 * 512, 4096, rngs=rngs),
-            "act1": nnx.relu,
-            "dp1": nnx.Dropout(dropout, rngs=rngs),
-            "fc2": nnx.Linear(4096, 4096, rngs=rngs),
-            "act2": nnx.relu,
-            "dp2": nnx.Dropout(dropout, rngs=rngs),
-            "out": nnx.Linear(4096, n_classes, rngs=rngs),
-        })
+        self.classifier = nnx.List([
+            nnx.Linear(7 * 7 * 512, 4096, rngs=rngs),
+            nnx.relu,
+            nnx.Dropout(dropout, rngs=rngs),
+            nnx.Linear(4096, 4096, rngs=rngs),
+            nnx.relu,
+            nnx.Dropout(dropout, rngs=rngs),
+            nnx.Linear(4096, n_classes, rngs=rngs),
+        ])
 
         # Download and load parameters if required
         if pretrained:
@@ -124,11 +124,11 @@ class VGG(nnx.Module, ABC):
         assert x.ndim == 4, f"Expected batched 4-dim inputs, got {x.ndim}-dim."
         assert x.shape[1:] == self.in_shape, \
             f"Expected image shape {self.in_shape}, got{x.shape[1:]}"
-        for layer in self.features.values():
+        for layer in self.features:
             x = layer(x)
         # Convert to PyTorch (B, C, H, W) for compatibility with pre-trained FC layers
         x = x.transpose(0, 3, 1, 2).reshape(x.shape[0], -1)
-        for layer in self.classifier.values():
+        for layer in self.classifier:
             x = layer(x)
         return x 
 
@@ -136,8 +136,8 @@ class VGG(nnx.Module, ABC):
         """Load the ImageNet-trained weights from PyTorch."""
         state_dict = torch.load(path, map_location="cpu")
         n_layers = 0 
-        for block in self.features.values():
-            for module in block.layers.values():
+        for block in self.features:
+            for module in block.layers:
                 match module:
                     case nnx.BatchNorm():
                         load_bn_from_torch(
@@ -158,7 +158,7 @@ class VGG(nnx.Module, ABC):
                 n_layers += 1
         
         n_layers = 0
-        for module in self.classifier.values():
+        for module in self.classifier:
             match module:
                 case nnx.Linear():
                     load_linear_from_torch(
@@ -171,7 +171,7 @@ class VGG(nnx.Module, ABC):
             n_layers += 1
     
     @abstractmethod
-    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.Dict:
+    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.List:
         """Create the feature extractor according to the chosen model from the VGG models."""
     
     @abstractmethod
@@ -198,15 +198,15 @@ class VGG11(VGG):
         rngs: RNG state to use for layer weight initialization.
     """
 
-    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.Dict:
+    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.List:
         """Create the feature extractor according to the chosen model from the VGG models."""
-        features = nnx.Dict({
-            "block1": VGGBlock(1, 3, 64, batch_norm=self.batch_norm, rngs=rngs),
-            "block2": VGGBlock(1, 64, 128, batch_norm=self.batch_norm, rngs=rngs),
-            "block3": VGGBlock(2, 128, 256, batch_norm=self.batch_norm, rngs=rngs),
-            "block4": VGGBlock(2, 256, 512, batch_norm=self.batch_norm, rngs=rngs),
-            "block5": VGGBlock(2, 512, 512, batch_norm=self.batch_norm, rngs=rngs),
-        })
+        features = nnx.List([
+            VGGBlock(1, 3, 64, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(1, 64, 128, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 128, 256, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 256, 512, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 512, 512, batch_norm=self.batch_norm, rngs=rngs),
+        ])
         return features
 
     def _download_weights_from_torch(self) -> Path:
@@ -242,15 +242,15 @@ class VGG13(VGG):
         rngs: RNG state to use for layer weight initialization.
     """
 
-    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.Dict:
+    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.List:
         """Create the feature extractor according to the chosen model from the VGG models."""
-        features = nnx.Dict({
-            "block1": VGGBlock(2, 3, 64, batch_norm=self.batch_norm, rngs=rngs),
-            "block2": VGGBlock(2, 64, 128, batch_norm=self.batch_norm, rngs=rngs),
-            "block3": VGGBlock(2, 128, 256, batch_norm=self.batch_norm, rngs=rngs),
-            "block4": VGGBlock(2, 256, 512, batch_norm=self.batch_norm, rngs=rngs),
-            "block5": VGGBlock(2, 512, 512, batch_norm=self.batch_norm, rngs=rngs),
-        })
+        features = nnx.List([
+            VGGBlock(2, 3, 64, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 64, 128, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 128, 256, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 256, 512, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 512, 512, batch_norm=self.batch_norm, rngs=rngs),
+        ])
         return features
 
     def _download_weights_from_torch(self) -> Path:
@@ -286,15 +286,15 @@ class VGG16(VGG):
         rngs: RNG state to use for layer weight initialization.
     """
 
-    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.Dict:
+    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.List:
         """Create the feature extractor according to the chosen model from the VGG models."""
-        features = nnx.Dict({
-            "block1": VGGBlock(2, 3, 64, batch_norm=self.batch_norm, rngs=rngs),
-            "block2": VGGBlock(2, 64, 128, batch_norm=self.batch_norm, rngs=rngs),
-            "block3": VGGBlock(3, 128, 256, batch_norm=self.batch_norm, rngs=rngs),
-            "block4": VGGBlock(3, 256, 512, batch_norm=self.batch_norm, rngs=rngs),
-            "block5": VGGBlock(3, 512, 512, batch_norm=self.batch_norm, rngs=rngs),
-        })
+        features = nnx.List([
+            VGGBlock(2, 3, 64, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 64, 128, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(3, 128, 256, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(3, 256, 512, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(3, 512, 512, batch_norm=self.batch_norm, rngs=rngs),
+        ])
         return features
 
     def _download_weights_from_torch(self) -> Path:
@@ -330,15 +330,15 @@ class VGG19(VGG):
         rngs: RNG state to use for layer weight initialization.
     """
 
-    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.Dict:
+    def _make_feature_extractor(self, *, rngs: nnx.Rngs) -> nnx.List:
         """Create the feature extractor according to the chosen model from the VGG models."""
-        features = nnx.Dict({
-            "block1": VGGBlock(2, 3, 64, batch_norm=self.batch_norm, rngs=rngs),
-            "block2": VGGBlock(2, 64, 128, batch_norm=self.batch_norm, rngs=rngs),
-            "block3": VGGBlock(4, 128, 256, batch_norm=self.batch_norm, rngs=rngs),
-            "block4": VGGBlock(4, 256, 512, batch_norm=self.batch_norm, rngs=rngs),
-            "block5": VGGBlock(4, 512, 512, batch_norm=self.batch_norm, rngs=rngs),
-        })
+        features = nnx.List([
+            VGGBlock(2, 3, 64, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(2, 64, 128, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(4, 128, 256, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(4, 256, 512, batch_norm=self.batch_norm, rngs=rngs),
+            VGGBlock(4, 512, 512, batch_norm=self.batch_norm, rngs=rngs),
+        ])
         return features
     
     def _download_weights_from_torch(self) -> Path:
