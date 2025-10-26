@@ -6,9 +6,9 @@ from jax import Array
 from numpy.typing import NDArray
 
 from lane_detection.detectors.base import LaneDetector
-from lane_detection.models import SCNN
-from lane_detection.transforms import Identity
+from lane_detection.models.scnn import SCNN
 from lane_detection.transforms.base import Transform
+from lane_detection.transforms.identity import Identity
 
 
 class SCNNLaneDetector(LaneDetector):

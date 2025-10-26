@@ -1,4 +1,5 @@
 from typing import Callable
+from functools import partial
 
 import jax
 import jax.lax as lax
@@ -9,10 +10,10 @@ from jax import Array
 from tqdm import tqdm
 
 from lane_detection.dataloaders.base import LaneDataloader
-from lane_detection.models import SCNN
+from lane_detection.models.scnn import SCNN
 from lane_detection.trainers.base import Trainer
-from lane_detection.transforms import Identity
 from lane_detection.transforms.base import Transform
+from lane_detection.transforms.identity import Identity
 
 BatchType = tuple[Array, Array, Array]          # (input, target_seg, target_ext)
 LossReturnType = tuple[Array, Array, Array]     # (loss, logits_seg, logits_ext)
@@ -120,8 +121,8 @@ class SCNNTrainer(Trainer):
             print(f"\t\t{key.replace('_', ' ').title()}: {metrics[-1].item():.4f}")
         print("")
 
-    @nnx.jit
     @staticmethod
+    @nnx.jit
     def _train_step(
         model: SCNN,
         optimizer: nnx.Optimizer,
@@ -144,8 +145,8 @@ class SCNNTrainer(Trainer):
         metrics["acc_ext"].update(logits=logits_ext, labels=batch[2])
         optimizer.update(grads)
     
-    @nnx.jit
     @staticmethod
+    @nnx.jit
     def _eval_step(
         model: SCNN,
         metrics: dict[str, nnx.Metric],
@@ -201,8 +202,8 @@ class SCNNTrainer(Trainer):
         
         return _loss_fn
     
-    @jax.jit
     @staticmethod
+    @partial(jax.jit, static_argnames=["n_lanes"])
     def _get_target_ext(target_seg: Array, n_lanes: int) -> Array:
         """Compute lane existence targets from segmentation targets.
         

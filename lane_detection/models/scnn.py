@@ -9,7 +9,7 @@ from flax import nnx
 from jax import Array
 from jax.image import ResizeMethod
 
-from lane_detection.models import VGG16
+from lane_detection.models.vgg import VGG16
 
 
 class MessagePassing(nnx.Module):
@@ -105,7 +105,7 @@ class SCNN(nnx.Module):
         ms_kernel_size: int,
         n_lanes: int,
         backbone: nnx.Module | None = None,
-        *
+        *,
         rngs: nnx.Rngs,
     ):
         h_in, w_in = input_size

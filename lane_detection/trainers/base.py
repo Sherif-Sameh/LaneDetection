@@ -54,17 +54,3 @@ class Trainer(ABC):
             metrics: Dict of NNX metrics to track during training step.
             batch: A tuple of arbitrary length of model input/s and target/s.
         """
-    
-    @staticmethod
-    @abstractmethod
-    def _loss_fn(model: nnx.Module, batch: tuple[Array, ...]) -> tuple[Array, ...]:
-        """Compute loss function for model using given batch and return loss + auxiliary values.
-        
-        Args:
-            model: NNX module to evaluate loss for.
-            batch: A tuple of arbitrary length of model input/s and target/s.
-        
-        Returns:
-            Tuple of arbitrary length where the first element **must** be the loss function,
-                followed by auxiliary arrays used for tracking metrics.
-        """
