@@ -3,7 +3,7 @@ from .compose import Compose
 from .identity import Identity
 from .normalize import Normalize
 from .resize import Resize
-from .to_array import ToArray
+from .to_array import ToArray, ToArrayMask
 
 __all__ = [
     "CenterCrop",
@@ -12,4 +12,5 @@ __all__ = [
     "Normalize",
     "Resize",
     "ToArray",
+    "ToArrayMask",
 ]

@@ -56,3 +56,51 @@ class ToArray(Transform):
         x = jnp.array(x, dtype=jnp.float32)
         x = x / 255 if dtype == np.uint8 else x
         return x
+
+
+@dataclass
+class ToArrayMask(Transform):
+    """Convert to JAX Array Mask transform.
+    
+    Unlike `ToArray`, this transform does not scale the input to [0.0, 1.0]. The input remains
+    an integer array to allow for use as a segmentation mask.
+    """
+
+    @classmethod
+    def create(
+        cls: Type["ToArrayMask"],
+    ) -> "ToArrayMask":
+        """Create a new ToArray transform."""
+        return cls()
+    
+    @singledispatchmethod
+    def __call__(self, x: Any) -> Array:
+        """Convert input segmentation mask to a JAX int Array from PIL Image or NumPy Array."""
+        raise NotImplementedError(f"Invalid input type {type(x)}.")
+    
+    @__call__.register
+    def _(self, x: Image) -> Array:
+        """Convert input segmentation mask to a JAX int Array from PIL Image.
+        
+        Args:
+            x: PIL Image of segmentation mask to convert to an array.
+        
+        Returns:
+            (H, W) int array segmentation mask.
+        """
+        x = jnp.asarray(x, dtype=jnp.int32)
+        return x
+    
+    @jax.jit
+    @__call__.register
+    def _(self, x: np.ndarray | Tracer) -> Array:
+        """Convert input segmentation mask to a JAX int Array from NumPy Array.
+        
+        Args:
+            x: (H, W) or (B, H, W) NumPy array of segmentation mask/s.
+        
+        Returns:
+            (H, W) or (B, H, W) int array of segmentation mask/s.
+        """
+        x = jnp.array(x, dtype=jnp.int32)
+        return x
