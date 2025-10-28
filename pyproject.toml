@@ -8,7 +8,7 @@ dependencies = [
     "opencv-python",
     "matplotlib >= 3.8.4",
     "jax[cuda] >= 0.5",
-    "flax",
+    "flax >= 0.12",
     "optax",
     "orbax",
     "fire >= 0.6.0",
