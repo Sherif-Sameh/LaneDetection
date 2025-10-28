@@ -3,7 +3,6 @@ from functools import partial
 from pathlib import Path
 
 import jax.image as image
-import jax.lax as lax
 import orbax.checkpoint as ocp
 from flax import nnx
 from jax import Array
@@ -33,9 +32,11 @@ class MessagePassing(nnx.Module):
         rngs: nnx.Rngs,
     ):
         self.in_features = in_features
-        self.vertical = vertical
-        self.reverse = reverse
         self.conv = nnx.Conv(in_features, in_features, kernel_size, use_bias=False, rngs=rngs)
+        
+        message_passing_fn = self._message_passing_vertical if vertical \
+            else self._message_passing_horizontal
+        self.message_passing_fn = partial(message_passing_fn, reverse=reverse)
     
     def __call__(self, x: Array) -> Array:
         """Apply message passing algorithm to input feature maps.
@@ -49,38 +50,35 @@ class MessagePassing(nnx.Module):
         assert x.ndim == 4, f"Expected batched 4-dim inputs, got {x.ndim}-dim."
         assert x.shape[3] == self.in_features, \
             f"Expected {self.in_features} features, got {x.shape[3]}"
-        x = lax.cond(
-            self.vertical,
-            self._message_passing_vertical,
-            self._message_passing_horizontal,
-            x,
-        )
+        x = self.message_passing_fn(self.conv, x)
         return x
     
-    @nnx.jit
-    def _message_passing_vertical(self, x: Array) -> Array:
+    @staticmethod
+    @partial(nnx.jit, static_argnames=["reverse"])
+    def _message_passing_vertical(conv: nnx.Conv, x: Array, reverse: bool) -> Array:
         def forward(i: int, input: tuple[nnx.Conv, Array]) -> Array:
             conv, x = input
             y = x.at[:, i].set(x[:, i] + nnx.relu(conv(x[:, i - 1])))
             return conv, y
         
         h_in = x.shape[1]
-        x = x[:, ::-1] if self.reverse else x
-        _, x = nnx.fori_loop(1, h_in, forward, (self.conv, x))
-        x = x[:, ::-1] if self.reverse else x
+        x = x[:, ::-1] if reverse else x
+        _, x = nnx.fori_loop(1, h_in, forward, (conv, x))
+        x = x[:, ::-1] if reverse else x
         return x
     
-    @nnx.jit
-    def _message_passing_horizontal(self, x: Array) -> Array:
+    @staticmethod
+    @partial(nnx.jit, static_argnames=["reverse"])
+    def _message_passing_horizontal(conv: nnx.Conv, x: Array, reverse: bool) -> Array:
         def forward(j: int, input: tuple[nnx.Conv, Array]) -> Array:
             conv, x = input
             y = x.at[:, :, j].set(x[:, :, j] + nnx.relu(conv(x[:, :, j - 1])))
             return conv, y
         
         w_in = x.shape[2]
-        x = x[:, :, ::-1] if self.reverse else x
-        _, x = nnx.fori_loop(1, w_in, forward, (self.conv, x))
-        x = x[:, :, ::-1] if self.reverse else x
+        x = x[:, :, ::-1] if reverse else x
+        _, x = nnx.fori_loop(1, w_in, forward, (conv, x))
+        x = x[:, :, ::-1] if reverse else x
         return x
 
 
@@ -245,4 +243,5 @@ class SCNN(nnx.Module):
         # Remove the max pool layers at the end of blocks 4 and 5
         backbone[-2].layers.pop(-1)
         backbone[-1].layers.pop(-1)
+        backbone = nnx.Sequential(*backbone)
         return backbone

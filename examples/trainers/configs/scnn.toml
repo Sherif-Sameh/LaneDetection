@@ -1,0 +1,47 @@
+
+# Data configuration
+[data]
+batch_size = 32                 # Batch size for both training and testing
+use_mmap = true                 # Keep dataset on drive and load into dynamically into memory
+
+
+# SCNN model configuration
+[scnn]
+input_size = [288, 800]         # Input image spatial dimensions (H, W)
+out_features = 512              # Number of backbone output features
+ms_kernel_size = 9              # Message passing module's kernel size
+n_lanes = 4                     # Max number of lanes (based on CULane)
+# backbone                      # Feature extractor backbone (None)
+
+
+# SCNN trainer configuration 
+[trainer]
+n_lanes = 4                     # Max number of lanes (based on CULane)
+loss_seg_weight = 1.0           # Weight for lane instance segmentation loss
+loss_ext_weight = 0.1           # Weight for lane existence predicition loss
+ 
+[[trainer.transform]]           # Input image transforms
+type = "ToArray"
+# [[trainer.transform]]
+# type = "CenterCrop"
+# [trainer.transform.kwargs]
+# size = [144, 400]
+[[trainer.transform]]
+type = "Normalize"
+[trainer.transform.kwargs]
+mean = [0.485, 0.456, 0.406]    # Mean values of ImageNet
+std = [0.229, 0.224, 0.225]     # Std values of ImageNet
+
+# Target mask image transforms
+[[trainer.target_transform]]
+type = "ToArrayMask"
+# [[trainer.target_transform]]
+# type = "CenterCrop"
+# [trainer.target_transform.kwargs]
+# size = [144, 400]
+
+# SCNN training configuration
+[train]
+n_epochs = 30                   # Number of epochs to train for 
+learning_rate = 1.6e-1          # Learning rate for AdamW optimizer
+weight_decay = 1e-4             # Weight decay for AdamW optimizer

@@ -15,8 +15,8 @@ from lane_detection.trainers.base import Trainer
 from lane_detection.transforms.base import Transform
 from lane_detection.transforms.identity import Identity
 
-BatchType = tuple[Array, Array, Array]          # (input, target_seg, target_ext)
-LossReturnType = tuple[Array, Array, Array]     # (loss, logits_seg, logits_ext)
+BatchType = tuple[Array, Array, Array]              # (input, target_seg, target_ext)
+LossReturnType = tuple[Array, tuple[Array, Array]]  # (loss, (logits_seg, logits_ext))
 
 
 class SCNNTrainer(Trainer):
@@ -47,7 +47,7 @@ class SCNNTrainer(Trainer):
         self.metrics = {
             "loss": nnx.metrics.Average(argname="loss"),
             "acc_seg": nnx.metrics.Accuracy(),
-            "acc_ext": nnx.metrics.Accuracy(),
+            "acc_ext": nnx.metrics.Accuracy(threshold=0.5),
         }
         SCNNTrainer._loss_fn = staticmethod(self._make_loss_fn(loss_seg_weight, loss_ext_weight))
     
@@ -101,6 +101,9 @@ class SCNNTrainer(Trainer):
                 target_ext = self._get_target_ext(target_seg, self.n_lanes)
                 self._eval_step(self.model, self.metrics, (input, target_seg, target_ext))
             self._update_and_report_metrics(metrics_history, train=False)
+        
+        for key, metric_history in metrics_history.items():
+            metrics_history[key] = jnp.stack(metric_history)
         return metrics_history
     
     def _update_and_report_metrics(
@@ -139,12 +142,12 @@ class SCNNTrainer(Trainer):
                 target (binary labels {0, 1}).
         """
         grad_fn = nnx.value_and_grad(SCNNTrainer._loss_fn, has_aux=True)
-        (loss, logits_seg, logits_ext), grads = grad_fn(model, batch)
+        (loss, (logits_seg, logits_ext)), grads = grad_fn(model, batch)
         metrics["loss"].update(loss=loss)
         metrics["acc_seg"].update(logits=logits_seg, labels=batch[1])
         metrics["acc_ext"].update(logits=logits_ext, labels=batch[2])
-        optimizer.update(grads)
-    
+        optimizer.update(model, grads)
+        
     @staticmethod
     @nnx.jit
     def _eval_step(
@@ -160,7 +163,7 @@ class SCNNTrainer(Trainer):
             batch: Tuple of input rgb images, segmentation target (int labels) and existence
                 target (binary labels {0, 1}).
         """
-        loss, logits_seg, logits_ext = SCNNTrainer._loss_fn(model, batch)
+        loss, (logits_seg, logits_ext) = SCNNTrainer._loss_fn(model, batch)
         metrics["loss"].update(loss=loss)
         metrics["acc_seg"].update(logits=logits_seg, labels=batch[1])
         metrics["acc_ext"].update(logits=logits_ext, labels=batch[2])
@@ -198,7 +201,7 @@ class SCNNTrainer(Trainer):
             ).mean()
             loss_ext = optax.losses.sigmoid_binary_cross_entropy(logits_ext, target_ext).mean()           
             loss = loss_seg_weight * loss_seg + loss_ext_weight * loss_ext
-            return loss, logits_seg, logits_ext
+            return loss, (logits_seg, logits_ext)
         
         return _loss_fn
     
@@ -220,5 +223,5 @@ class SCNNTrainer(Trainer):
             return target_seg, target_ext
         
         target_ext = jnp.zeros((target_seg.shape[0], n_lanes), dtype=jnp.int32)
-        target_ext = lax.fori_loop(0, n_lanes, set_lane_ext, (target_seg, target_ext))
+        _, target_ext = lax.fori_loop(0, n_lanes, set_lane_ext, (target_seg, target_ext))
         return target_ext
