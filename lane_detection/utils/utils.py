@@ -105,5 +105,5 @@ def convert_transforms(transforms: list[dict[str, Any]]) -> tf.Compose:
         type = transform["type"]
         kwargs = transform.get("kwargs", {})
         cls = getattr(tf, type)
-        transforms_list.append(cls(**kwargs))
+        transforms_list.append(cls.create(**kwargs))
     return tf.Compose.create(transforms_list)

@@ -30,17 +30,17 @@ class CenterCrop(Transform):
         """Crop the given image at the center.
         
         Args:
-            x: (B, H, W, C) array of input images.
+            x: (B, H, W, ...) array of input images.
         
         Returns:
-            (B, H_size, W_size, C) array of output cropped images.
+            (B, H_size, W_size, ...) array of output cropped images.
         """
-        assert x.ndim == 4
+        assert x.ndim >= 3
         h_in, w_in = x.shape[1:3]
         h_out, w_out = self.size
         assert h_in >= h_out and w_in >= w_out
         
         top = int(round((h_in - h_out) / 2.0))
         left = int(round((w_in - w_out) / 2.0))
-        x = x[:, top: top + h_out, left: left + w_out, :]
+        x = x[:, top: top + h_out, left: left + w_out]
         return x

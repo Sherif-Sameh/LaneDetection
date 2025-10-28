@@ -53,7 +53,7 @@ class ToArray(Transform):
             (H, W, C) or (B, H, W, C) float array image/s with intensity [0.0, 1.0].
         """
         dtype = x.dtype
-        x = jnp.array(x, dtype=jnp.float32)
+        x = jnp.asarray(x, dtype=jnp.float32)
         x = x / 255 if dtype == np.uint8 else x
         return x
 
@@ -102,5 +102,5 @@ class ToArrayMask(Transform):
         Returns:
             (H, W) or (B, H, W) int array of segmentation mask/s.
         """
-        x = jnp.array(x, dtype=jnp.int32)
+        x = jnp.asarray(x, dtype=jnp.int32)
         return x
