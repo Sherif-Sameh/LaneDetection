@@ -55,4 +55,6 @@ class NumPyLaneDataloader(LaneDataloader):
         """
         n_samples = len(self.dataset)
         idxs = self.rng.permutation(n_samples)
-        return np.split(idxs, np.arange(self.batch_size, n_samples, self.batch_size))
+        idxs = np.split(idxs, np.arange(self.batch_size, n_samples, self.batch_size))
+        idxs = [np.sort(batch_idxs) for batch_idxs in idxs]
+        return idxs

@@ -11,11 +11,11 @@ dependencies = [
     "flax >= 0.12",
     "optax",
     "orbax",
-    "fire >= 0.6.0",
     "wandb",
     "kagglehub",
     "toml",
     "pillow",
+    "h5py",
 ]
 
 [tool.pixi.workspace]

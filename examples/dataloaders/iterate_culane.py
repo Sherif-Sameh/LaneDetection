@@ -40,7 +40,7 @@ def main():
     path = Path(__file__).parents[2] / "data/CULane"
     dataset = CULaneDataset(path, val=0.0, test=0.1)
     dataset.download()
-    dataset.load(use_mmap=True)
+    dataset.load()
 
     # Initialize dataloder and get sample batch from it
     dataloader = NumPyLaneDataloader(dataset, batch_size=9, shuffle=True)
