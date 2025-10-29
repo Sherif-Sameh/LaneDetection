@@ -45,7 +45,7 @@ class SCNNTrainer(Trainer):
         self.transform = transform
         self.target_transform = target_transform
         self.metrics = {
-            "loss": nnx.metrics.Average(argname="loss"),
+            "loss": nnx.metrics.Average(),
             "acc_seg": nnx.metrics.Accuracy(),
             "acc_ext": nnx.metrics.Accuracy(threshold=0.5),
         }
@@ -88,7 +88,7 @@ class SCNNTrainer(Trainer):
         for _ in tqdm(range(n_epochs), desc="Epochs"):
             # Train and record training metrics histories
             self.model.train()
-            for input, target_seg in tqdm(dataloader, desc="Training"):
+            for input, target_seg in dataloader:
                 input, target_seg = self.transform(input), self.target_transform(target_seg)
                 target_ext = self._get_target_ext(target_seg, self.n_lanes)
                 self._train_step(self.model, optimizer, self.metrics, (input, target_seg, target_ext))
@@ -96,11 +96,12 @@ class SCNNTrainer(Trainer):
             
             # Test and record testing metrics histories
             self.model.eval()
-            for input, target_seg in tqdm(test_dataloader, desc="Testing"):
+            for input, target_seg in test_dataloader:
                 input, target_seg = self.transform(input), self.target_transform(target_seg)
                 target_ext = self._get_target_ext(target_seg, self.n_lanes)
                 self._eval_step(self.model, self.metrics, (input, target_seg, target_ext))
             self._update_and_report_metrics(metrics_history, train=False)
+            self.model.save()
         
         for key, metric_history in metrics_history.items():
             metrics_history[key] = jnp.stack(metric_history)
@@ -116,12 +117,13 @@ class SCNNTrainer(Trainer):
         for key, metric in self.metrics.items():
             metrics_history[f"{prefix}_{key}"].append(metric.compute())
             metric.reset()
-        epoch = len(metrics_history[f"{prefix}_{key}"]) + 1
+        epoch = len(metrics_history[f"{prefix}_{key}"])
         if train: 
             print(f"Epoch {epoch}\n")
         print(f"\t{prefix.title()} Metrics:") 
         for key, metrics in metrics_history.items():
-            print(f"\t\t{key.replace('_', ' ').title()}: {metrics[-1].item():.4f}")
+            if prefix in key:
+                print(f"\t\t{key.replace('_', ' ').title()}: {metrics[-1].item():.4f}")
         print("")
 
     @staticmethod
@@ -143,7 +145,7 @@ class SCNNTrainer(Trainer):
         """
         grad_fn = nnx.value_and_grad(SCNNTrainer._loss_fn, has_aux=True)
         (loss, (logits_seg, logits_ext)), grads = grad_fn(model, batch)
-        metrics["loss"].update(loss=loss)
+        metrics["loss"].update(values=loss)
         metrics["acc_seg"].update(logits=logits_seg, labels=batch[1])
         metrics["acc_ext"].update(logits=logits_ext, labels=batch[2])
         optimizer.update(model, grads)
@@ -164,7 +166,7 @@ class SCNNTrainer(Trainer):
                 target (binary labels {0, 1}).
         """
         loss, (logits_seg, logits_ext) = SCNNTrainer._loss_fn(model, batch)
-        metrics["loss"].update(loss=loss)
+        metrics["loss"].update(values=loss)
         metrics["acc_seg"].update(logits=logits_seg, labels=batch[1])
         metrics["acc_ext"].update(logits=logits_ext, labels=batch[2])
 

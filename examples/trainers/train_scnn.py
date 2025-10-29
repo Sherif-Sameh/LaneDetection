@@ -15,12 +15,12 @@ from lane_detection.trainers import SCNNTrainer
 from lane_detection.utils import convert_transforms
 
 
-def get_dataloader(batch_size: int, use_mmap: bool, test: bool = False) -> NumPyLaneDataloader:
+def get_dataloader(batch_size: int, test: bool = False) -> NumPyLaneDataloader:
     path = Path(__file__).parents[2] / "data/CULane"
     dataset = CULaneDataset(path, val=0.0, test=0.1)
     if not any(path.iterdir()):
         dataset.download()
-    dataset.load(test=test, use_mmap=use_mmap)
+    dataset.load(test=test)
     dataloader = NumPyLaneDataloader(dataset, batch_size=batch_size, shuffle=(not test))
     return dataloader
 

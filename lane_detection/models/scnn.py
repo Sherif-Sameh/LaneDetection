@@ -1,3 +1,4 @@
+import shutil
 import warnings
 from functools import partial
 from pathlib import Path
@@ -196,7 +197,7 @@ class SCNN(nnx.Module):
         """Save the current model's weights using Orbax."""
         ckpt_path = Path(__file__).parent / "weights/scnn"
         if ckpt_path.exists():
-            ckpt_path.unlink()
+            shutil.rmtree(ckpt_path)
         _, state = nnx.split(self)
         pure_dict_state = nnx.to_pure_dict(state)
         checkpointer = ocp.StandardCheckpointer()

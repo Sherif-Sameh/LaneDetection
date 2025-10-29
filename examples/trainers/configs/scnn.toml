@@ -2,7 +2,6 @@
 # Data configuration
 [data]
 batch_size = 32                 # Batch size for both training and testing
-use_mmap = true                 # Keep dataset on drive and load into dynamically into memory
 
 
 # SCNN model configuration
@@ -42,6 +41,6 @@ type = "ToArrayMask"
 
 # SCNN training configuration
 [train]
-n_epochs = 30                   # Number of epochs to train for 
-learning_rate = 1.6e-1          # Learning rate for AdamW optimizer
+n_epochs = 5                    # Number of epochs to train for 
+learning_rate = 1.0e-3          # Learning rate for AdamW optimizer
 weight_decay = 1e-4             # Weight decay for AdamW optimizer
