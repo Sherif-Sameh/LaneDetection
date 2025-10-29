@@ -34,7 +34,7 @@ def main():
     path = Path(__file__).parents[2] / "data/TuSimple"
     dataset = TuSimpleDataset(path, val=0.0)
     dataset.download()
-    dataset.load(use_mmap=True)
+    dataset.load()
 
     # Initialize dataloder and get sample batch from it
     dataloader = NumPyLaneDataloader(dataset, batch_size=9, shuffle=True)

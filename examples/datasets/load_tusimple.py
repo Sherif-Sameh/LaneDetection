@@ -31,19 +31,19 @@ def main():
     # Download and load the TuSimple dataset
     path = Path(__file__).parents[2] / "data/TuSimple"
     dataset = TuSimpleDataset(path, val=0.0)
-    dataset.download()
+    dataset.download(batch_size=3072)
     
     # Extract subset of 9 images from training dataset
-    dataset.load(use_mmap=True)
-    idxs = np.random.choice(len(dataset), size=9, replace=False)
+    dataset.load()
+    idxs = np.sort(np.random.choice(len(dataset), size=9, replace=False))
     images, labels = dataset[idxs]
 
     # Visualize images with labels overlayed on top
     visualize_lanes(images, labels)
 
     # Extract subset of 9 images from test dataset
-    dataset.load(test=True, use_mmap=True)
-    idxs = np.random.choice(len(dataset), size=9, replace=False)
+    dataset.load(test=True)
+    idxs = np.sort(np.random.choice(len(dataset), size=9, replace=False))
     images, labels = dataset[idxs]
 
     # Visualize images with labels overlayed on top

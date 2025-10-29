@@ -1,14 +1,13 @@
 import json
-import os
+import random
 import warnings
 from pathlib import Path
 
 import cv2
+import h5py
+import kagglehub
 import numpy as np
 from numpy.typing import NDArray
-
-import fire
-import kagglehub
 from tqdm import tqdm
 
 from lane_detection.datasets.base import LaneDataset
@@ -27,8 +26,6 @@ class TuSimpleDataset(LaneDataset):
         height: Height for resizing images and labels.
         width: Width for resizing images and labels.
     """
-    N_TRAIN_VAL_IMGS = 3626
-    N_TEST_IMGS = 2782
     
     def __init__(
         self,path: Path,
@@ -39,8 +36,9 @@ class TuSimpleDataset(LaneDataset):
         super().__init__(path, val=val, test=0.0)
         self.height = height
         self.width = width
-        self.files = ("images.npy", "labels.npy", "metadata.json")
+        self.files = ("dataset.hdf5", "metadata.json")
 
+        self.data = None
         self.images = np.zeros((0, self.height, self.width, 3), dtype=np.uint8)
         self.labels = np.zeros((0, self.height, self.width), dtype=np.uint8)
     
@@ -52,51 +50,46 @@ class TuSimpleDataset(LaneDataset):
         """Retrieve data sample/s from the dataset and return them."""
         return self.images[idx], self.labels[idx]
 
-    def download(self) -> None:
+    def download(self, batch_size: int = 1024) -> None:
         """Download the TuSimple dataset with segmentation-based annotations.
     
         Note: The downloaded dataset comes from the pre-processed entry on Kaggle available at the
         following link:
         https://www.kaggle.com/datasets/hikmatullahmohammadi/tusimple-preprocessed.
+        
+        Args:
+            batch_size: Batch size for converting dataset.
         """
         if self.exists():
             warnings.warn(
                 "Dataset already exists. To re-download/convert, delete it and try again."
             )
             return
-        
-        # Get credentials either from kaggle.json or by propmting user
-        kaggle_dir = Path().home() / ".kaggle" if "KAGGLE_CONFIG_DIR" not in os.environ \
-            else Path(os.environ["KAGGLE_CONFIG_DIR"])
-        kaggle_path = kaggle_dir / "kaggle.json"
-        if not kaggle_path.exists():
-            kagglehub.login()
 
         # Download dataset
         download_path = kagglehub.dataset_download("hikmatullahmohammadi/tusimple-preprocessed")
         download_path = Path(download_path)
 
         # Convert dataset to NumPy arrays and store it into desired directory
-        self._convert(download_path)
+        self._convert(download_path, batch_size)
     
-    def load(self, val: bool = False, test: bool = False, use_mmap: bool = True) -> None:
+    def load(self, val: bool = False, test: bool = False) -> None:
         """Load the stored dataset to prepare for data reading.
         
         Args:
             val: Load the data allocated for validation instead of training.
             test: Load the data allocated for testing instead of training. If both val and test
                 flags are set, then validation takes higher precedence over testing.
-            use_mmap: Keep dataset on disk and load slices dynamically in RAM as needed.
         """
         assert self.exists(), f"Dataset does not exist at {self.paths[0].parent}."
         path = self.paths[2] if test else self.paths[0]
         path = self.paths[1] if val else path
 
         # Load dataset
-        mmap_mode = "r" if use_mmap else None
-        self.images = np.load(path / self.files[0], mmap_mode=mmap_mode)
-        self.labels = np.load(path / self.files[1], mmap_mode=mmap_mode)
-        with open(path / self.files[2], "r") as metafile:
+        self.data = h5py.File(path / self.files[0], "r")
+        self.images = self.data["images"]
+        self.labels = self.data["labels"]
+        with open(path / self.files[1], "r") as metafile:
             self.metadata = json.load(metafile)
     
     def exists(self) -> bool:
@@ -111,114 +104,178 @@ class TuSimpleDataset(LaneDataset):
             dir_flags.append(dir_flag)
         return all(dir_flags)
     
-    def _convert(self, download_path: Path) -> None:
+    def _convert(self, download_path: Path, batch_size: int) -> None:
         """Iterates through TuSimple dataset to extract all images and labels, resize them as needed
-        and store them into .npy files.
+        and store them into .hdf5 files.
     
         Args:
             download_path: Path to raw TuSimple dataset.
+            batch_size: Batch size for converting dataset.
         """
-        images_path = download_path / "tusimple_preprocessed/training/frames"
-        labels_path = download_path / "tusimple_preprocessed/training/lane-masks"
-        split_idxs = self._get_permutations(self.N_TRAIN_VAL_IMGS)
+        # Prepare dataset files for storing samples
+        img_shape = (self.height, self.width, 3)
+        sizes = self._get_sizes(download_path)
+        files = [self._create_file(path, size, img_shape, dtype="uint8") \
+                 for (path, size) in zip(self.paths, sizes)]
         
         # Process and store images and labels for training/validation dataset
-        images, labels = self._get_images_labels(
-            images_path, labels_path, self.N_TRAIN_VAL_IMGS, "Train/Val"
+        images_path = download_path / "tusimple_preprocessed/training/frames"
+        labels_path = download_path / "tusimple_preprocessed/training/lane-masks"
+        self._store_images_labels(
+            images_path,
+            labels_path,
+            files[:2],
+            sizes[:2],
+            batch_size,
+            "Train/Val",
+            shuffle=True,
         )
-        for p, idxs in zip(self.paths[:2], split_idxs):
-            images_split = images[idxs]
-            np.save(p / self.files[0], images_split)
-            del images_split
-            labels_split = labels[idxs]
-            np.save(p / self.files[1], labels_split)
-            del labels_split
-        del images, labels
 
         # Process and store images and labels for testing dataset
         images_path = download_path / "tusimple_preprocessed/test/frames"
         labels_path = download_path / "tusimple_preprocessed/test/lane-masks"
-        images, labels = self._get_images_labels(
-            images_path, labels_path, self.N_TEST_IMGS, "Test"
+        self._store_images_labels(
+            images_path,
+            labels_path,
+            files[2:],
+            sizes[2:],
+            batch_size,
+            "Test",
+            shuffle=False,
         )
-        np.save(self.paths[2] / self.files[0], images)
-        np.save(self.paths[2] / self.files[1], labels)
-        del images, labels
 
+        for file in files:
+            file.close()
+        
         # Store dataset's metadata
-        sizes = [len(idxs) for idxs in split_idxs] + [self.N_TEST_IMGS]
         for p, size in zip(self.paths, sizes):
             metadata = {
                 "size": size,
                 "image_shape": (self.height, self.width, 3),
                 "label_shape": (self.height, self.width),
             }
-            with open(p / self.files[2], "w") as metafile: 
+            with open(p / self.files[1], "w") as metafile: 
                 json.dump(metadata, metafile, indent=4)
     
-    def _get_permutations(self, size: int) -> tuple[NDArray, NDArray, NDArray]:
-        """Get permutations for shuffling and splitting the training dataset into train and val.
+    def _get_sizes(self, download_path: Path) -> tuple[int, int, int]:
+        """Calculate the sizes of each dataset based on total size and data split."""
+        # Count samples in training and validation dataset
+        images_path = download_path / "tusimple_preprocessed/training/frames"
+        labels_path = download_path / "tusimple_preprocessed/training/lane-masks"
+        total_train_val_size = 0
+        for image_file in images_path.iterdir():
+            if image_file.suffix != ".jpg":
+                continue
+            label_file = labels_path / image_file.name
+            if not label_file.exists():
+                continue
+            total_train_val_size += 1
+        train_size = int(total_train_val_size * self.split[0])
+        val_size = total_train_val_size - train_size
+        
+        # Count samples in testing dataset
+        images_path = download_path / "tusimple_preprocessed/test/frames"
+        labels_path = download_path / "tusimple_preprocessed/test/lane-masks"
+        test_size = 0
+        for image_file in images_path.iterdir():
+            if image_file.suffix != ".jpg":
+                continue
+            label_file = labels_path / image_file.name
+            if not label_file.exists():
+                continue
+            test_size += 1
+        return train_size, val_size, test_size
+    
+    def _create_file(
+        self,
+        path: Path,
+        size: int,
+        shape: tuple[int, ...],
+        dtype: str = "int",
+    ) -> h5py.File:
+        """Create a hdf5 file for storing dataset.
+        
+        Args:
+            path: Path to directory to store dataset within.
+            size: Total number of samples to be stored in dataset.
+            shape: Shape of images to be stored in dataset of the format (H, W, 3).
+            dtype: Data type of images and labels.
         
         Returns:
-            tuple
-            - train_idxs: array containing indices for training samples.
-            - val_idxs: array containing indices for validation samples.
+            H5Py File object for created dataset opened in "write" mode.
         """
-        train_size = int(size * self.split[0])
-        val_size = size - train_size
-        split_cumsum = np.cumsum([train_size, val_size], dtype=np.long)
-
-        perm = np.random.permutation(size)
-        train_idxs = perm[:split_cumsum[0]]
-        val_idxs = perm[split_cumsum[0]: split_cumsum[1]]
-        return train_idxs, val_idxs
+        images_shape = (size,) + shape
+        labels_shape = (size,) + shape[:-1]
+        f = h5py.File(str(path / self.files[0]), mode="w")
+        f.create_dataset("images", shape=images_shape, dtype=dtype)
+        f.create_dataset("labels", shape=labels_shape, dtype=dtype)
+        return f
     
-    def _get_images_labels(
+    def _store_images_labels(
         self,
         images_path: Path,
         labels_path: Path,
-        size: int,
+        files: tuple[h5py.File, ...],
+        sizes: tuple[int, ...],
+        batch_size: int,
         data_title: str,
-    ) -> tuple[NDArray[np.uint8], NDArray[np.uint8]]:
-        """Loop image and label directories, get all entries, pre-process them and return them as
-        NumPy arrays.
+        shuffle: bool = False,
+    ) -> None:
+        """Loop image and label directories, get all entries, pre-process them and store them into
+        .hdf5 files.
         
         Args:
             images_path: Path to the directory containing the dataset's images.
             labels_path: Path to the directory containing the dataset's labels.
-            size: Number of expected image and label pairs in the dataset.
-            data_title: Title to display with tqdm while processing the dataset.
-        
-        Returns:
-            tuple
-            images: (N, H, W, 3) uint8 array containing the processed dataset RGB images.
-            labels: (N, H, W) uint8 array containing the processed dataset lane labels.
+            files: H5Py files for storing dataset/s.
+            sizes: Number of expected image and label pairs in dataset/s.
+            batch_size: Batch size for converting dataset/s.
+            data_title: Title to display with tqdm while processing the dataset/s.
+            shuffle: Iterate over the dataset in random order.
         """
-        images_shape = (size, self.height, self.width, 3)
+        images_shape = (batch_size, self.height, self.width, 3)
         labels_shape = images_shape[:-1]  # labels don't need a channel dimension
-        images = np.zeros(images_shape, dtype=np.uint8)
-        labels = np.zeros(labels_shape, dtype=np.uint8)
-        image_idx = 0
-        for image_file in tqdm(
-            sorted(images_path.iterdir()), desc=f"Processing {data_title} Data"
-        ):
+        images_paths = sorted(images_path.iterdir())
+        if shuffle:
+            random.shuffle(images_paths)
+        
+        img_batch = np.zeros(images_shape, dtype=np.uint8)
+        lbl_batch = np.zeros(labels_shape, dtype=np.uint8)
+        n_samples, data_idx = 0, 0
+        for image_file in tqdm(images_paths, desc=f"Processing {data_title} Data"):
             if image_file.suffix != ".jpg":
                 continue
             label_file = labels_path / image_file.name
-            assert label_file.exists(), f"Label missing for {image_file.name}"
+            if not label_file.exists():
+                continue
 
+            sample_idx = n_samples % batch_size
             image = cv2.cvtColor(cv2.imread(image_file, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
             label = cv2.cvtColor(cv2.imread(label_file, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
-            images[image_idx] = cv2.resize(image, (self.width, self.height))
-            labels[image_idx] = cv2.resize(label, (self.width, self.height))[..., 0]
-            image_idx += 1
-        assert image_idx == size, f"Missing images from dataset. Found {image_idx}/{size}."
-        return images, labels
+            img_batch[sample_idx] = cv2.resize(image, (self.width, self.height))
+            lbl_batch[sample_idx] = cv2.resize(label, (self.width, self.height))[..., 0]
+            n_samples += 1
 
-def main(data_dir: str, val: float = 0.1):
-    dataset = TuSimpleDataset(Path(data_dir), val=val)
-    dataset.download()
-
-
-if __name__ == "__main__":
-    fire.Fire(main)
+            is_complete = n_samples == sizes[data_idx]
+            if n_samples % batch_size == 0 or is_complete:
+                self._write_batch_to_file(files[data_idx], n_samples, img_batch, lbl_batch)
+                if is_complete:
+                    n_samples = 0
+                    data_idx += 1
+                while data_idx < len(sizes) and sizes[data_idx] == 0:
+                    data_idx += 1
+        
+    def _write_batch_to_file(
+        self,
+        file: h5py.File,
+        n_samples: int,
+        imgs: NDArray,
+        lbls: NDArray,
+    ) -> None:
+        """Write a batch of images and labels into H5Py dataset file."""
+        batch_size = imgs.shape[0]
+        n_valid = (n_samples - 1) % batch_size
+        start = ((n_samples - 1) // batch_size) * batch_size
+        end = start + n_valid
+        file["images"][start: end + 1] = imgs[:n_valid + 1]
+        file["labels"][start: end + 1] = lbls[:n_valid + 1]

@@ -43,7 +43,7 @@ def main():
     path = Path(__file__).parents[2] / "data/TuSimple"
     dataset = TuSimpleDataset(path, val=0.0)
     dataset.download()
-    dataset.load(use_mmap=True)
+    dataset.load()
     
     # Load detector config and initialize it
     path = Path(__file__).parent / "configs/classical.toml"

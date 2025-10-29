@@ -104,7 +104,7 @@ class CULaneDataset(LaneDataset):
     
     def _convert(self, download_path: Path, batch_size: int) -> None:
         """Iterates through CULane dataset to extract all images and labels, resize them as needed
-        and store them into .npy files.
+        and store them into .hdf5 files.
     
         Args:
             download_path: Path to raw CULane dataset.
@@ -115,13 +115,14 @@ class CULaneDataset(LaneDataset):
         
         # Prepare dataset files for storing samples
         img_shape = (self.height, self.width, 3)
-        video_dirs = list(images_path.iterdir())
-        shuffle(video_dirs)
         sizes = self._get_sizes(download_path)
         files = [self._create_file(path, size, img_shape, dtype="uint8") \
                  for (path, size) in zip(self.paths, sizes)]
         
         # Process and store images and labels
+        video_dirs = list(images_path.iterdir())
+        shuffle(video_dirs)
+        
         n_samples, data_idx = 0, 0
         img_batch = np.zeros((batch_size,) + img_shape, dtype=np.uint8)
         lbl_batch = np.zeros((batch_size,) + img_shape[:-1], dtype=np.uint8)
