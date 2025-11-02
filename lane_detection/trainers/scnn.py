@@ -1,5 +1,6 @@
-from typing import Callable
+from collections.abc import Sequence
 from functools import partial
+from typing import Callable
 
 import jax
 import jax.lax as lax
@@ -27,6 +28,7 @@ class SCNNTrainer(Trainer):
         n_lanes: Maximum number of unique lanes that can exist in an input image.
         loss_seg_weight: Weight for lane instance segmentation cross-entropy loss.
         loss_ext_weight: Weight for lane existence prediction binary cross-entropy loss.
+        class_weights: Optional sequence of class weights for lane instance segmentation loss.
         transform: Image transform applied to input RGB images.
         target_transforms: Image transform applied to lane segmentation masks.
     """
@@ -37,9 +39,12 @@ class SCNNTrainer(Trainer):
         n_lanes: int,
         loss_seg_weight: float = 1.0,
         loss_ext_weight: float = 0.1,
+        class_weights: Sequence[float] | None = None,
         transform: Transform = Identity.create(),
         target_transform: Transform = Identity.create(),
     ):
+        if class_weights is not None:
+            assert len(class_weights) == n_lanes + 1, "class_weights length must equal n_lanes + 1."
         super().__init__(model)
         self.n_lanes = n_lanes
         self.transform = transform
@@ -49,7 +54,9 @@ class SCNNTrainer(Trainer):
             "acc_seg": nnx.metrics.Accuracy(),
             "acc_ext": nnx.metrics.Accuracy(threshold=0.5),
         }
-        SCNNTrainer._loss_fn = staticmethod(self._make_loss_fn(loss_seg_weight, loss_ext_weight))
+        SCNNTrainer._loss_fn = staticmethod(
+            self._make_loss_fn(loss_seg_weight, loss_ext_weight, class_weights)
+        )
     
     def train(
         self,
@@ -174,6 +181,7 @@ class SCNNTrainer(Trainer):
     def _make_loss_fn(
         loss_seg_weight: float,
         loss_ext_weight: float,
+        class_weights: Sequence[float] | None = None,
     ) -> Callable[[SCNN, BatchType], LossReturnType]:
         """Contructs and returns a combined loss function for lane segmentation and existence
         prediction that is parameterized by the given weights for combining the two losses.
@@ -181,10 +189,12 @@ class SCNNTrainer(Trainer):
         Args:
             loss_seg_weight: Weight for lane instance segmentation cross-entropy loss.
             loss_ext_weight: Weight for lane existence prediction binary cross-entropy loss.
+            class_weights: Optional sequence of class weights for lane instance segmentation loss.
         
         Returns:
             Closure over loss function parameterized with given loss weights.
         """
+        class_weights = jnp.array(class_weights) if class_weights is not None else None
         def _loss_fn(model: SCNN, batch: BatchType) -> LossReturnType:
             """Compute the combined loss function for SCNN lane predicition. The combined loss is made
             up of a weighted sum of two losses: CE (segmentation) + BCE (existence).
@@ -198,9 +208,7 @@ class SCNNTrainer(Trainer):
             """
             input, target_seg, target_ext = batch
             logits_seg, logits_ext = model(input)
-            loss_seg = optax.losses.softmax_cross_entropy_with_integer_labels(
-                logits_seg, target_seg
-            ).mean()
+            loss_seg = cross_entropy_loss(logits_seg, target_seg, class_weights).mean()
             loss_ext = optax.losses.sigmoid_binary_cross_entropy(logits_ext, target_ext).mean()           
             loss = loss_seg_weight * loss_seg + loss_ext_weight * loss_ext
             return loss, (logits_seg, logits_ext)
@@ -227,3 +235,31 @@ class SCNNTrainer(Trainer):
         target_ext = jnp.zeros((target_seg.shape[0], n_lanes), dtype=jnp.int32)
         _, target_ext = lax.fori_loop(0, n_lanes, set_lane_ext, (target_seg, target_ext))
         return target_ext
+
+
+def cross_entropy_loss(logits: Array, targets: Array, weights: Array | None = None) -> Array:
+    """Compute the cross entropy loss between logits and targets with class weights.
+
+    Defined since Optax does not have a built-in cross entropy loss with class weights.
+    
+    Args:
+        logits: (N, H, W, C) array of model output logits.
+        targets: (N, H, W) array of ground truth class indices.
+        weights: Optional (C,) array of class weights.
+    
+    Returns:
+        (N, H, W) array of weighted cross entropy losses for each pixel/image.
+    """
+    assert logits.dtype == jnp.float32 or logits.dtype == jnp.float64
+    assert targets.dtype == jnp.int32 or targets.dtype == jnp.int64
+    if weights is not None:
+        assert weights.shape[-1] == logits.shape[-1]
+        label_weights = weights[targets]  # (N, H, W)
+    else:
+        label_weights = jnp.ones((logits.shape[:-1]), dtype=logits.dtype, device=logits.device)
+    label_logits = jnp.take_along_axis(
+        logits, targets[..., None], axis=-1
+    ).squeeze(-1)  # (N, H, W)
+    logsumexp = jax.nn.logsumexp(logits, axis=-1)
+    loss = label_weights * (logsumexp - label_logits)
+    return loss

@@ -8,6 +8,7 @@ from torch import Tensor
 
 import lane_detection.transforms as tf
 
+
 def download_weights_from_url(url: str, file: Path) -> None:
     """Download the PyTorch model weights from URL."""
     out_dir = file.parent

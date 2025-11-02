@@ -15,9 +15,10 @@ n_lanes = 4                     # Max number of lanes (based on CULane)
 
 # SCNN trainer configuration 
 [trainer]
-n_lanes = 4                     # Max number of lanes (based on CULane)
-loss_seg_weight = 1.0           # Weight for lane instance segmentation loss
-loss_ext_weight = 0.1           # Weight for lane existence predicition loss
+n_lanes = 4                                 # Max number of lanes (based on CULane)
+loss_seg_weight = 1.0                       # Weight for lane instance segmentation loss
+loss_ext_weight = 0.1                       # Weight for lane existence predicition loss
+class_weights = [0.1, 1.0, 1.0, 1.0, 1.0]   # Class weights for lane instance segmentation loss
  
 [[trainer.transform]]           # Input image transforms
 type = "ToArray"
