@@ -203,18 +203,23 @@ class SCNN(nnx.Module):
         checkpointer = ocp.StandardCheckpointer()
         checkpointer.save(ckpt_path, pure_dict_state)
     
-    def load(self) -> None:
-        """Load saved model weights using Orbax if they exist."""
+    def load(self) -> "SCNN":
+        """Load and return saved model using Orbax if its weights exist.
+        
+        Returns:
+            New SCNN model with pre-trained weights.
+        """
         ckpt_path = Path(__file__).parent / "weights/scnn"
         if not ckpt_path.exists():
             warnings.warn(f"No checkpoints found for SCNN at {ckpt_path.parent}.")
             return
         checkpointer = ocp.StandardCheckpointer()
         pure_dict_state = checkpointer.restore(ckpt_path)
-        abstract_model = nnx.eval_shape(self)
+        abstract_model = nnx.eval_shape(lambda: self)
         graphdef, abstract_state = nnx.split(abstract_model)
         nnx.replace_by_pure_dict(abstract_state, pure_dict_state)
-        self = nnx.merge(graphdef, abstract_state)
+        model = nnx.merge(graphdef, abstract_state)
+        return model
     
     def _get_default_backbone(self, *, rngs: nnx.Rngs) -> nnx.Module:
         """Get default SCNN VGG16-BN backbone with pre-trained ImageNet weights.

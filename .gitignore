@@ -423,3 +423,6 @@ data/*
 # PyTorch models
 *.pth
 *.pt
+
+# Flax models
+**/weights/*
