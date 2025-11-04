@@ -66,8 +66,8 @@ def overlay_lane_masks(img: Array, pred_mask: Array, gt_mask: Array) -> NDArray:
     cv2.putText(pred_img, "SCNN", (30, 50), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
     cv2.putText(gt_img, "Ground Truth", (30, 50), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
-    # Concatenate prediction and GT images horizontally
-    combined = np.concatenate((pred_img, gt_img), axis=1)
+    # Concatenate prediction and GT images vertically
+    combined = np.concatenate((pred_img, gt_img), axis=0)
     combined = cv2.cvtColor(combined, cv2.COLOR_BGR2RGB)
     return combined
 
@@ -84,7 +84,7 @@ def main():
     # Create video writer with imageio
     path = Path(__file__).parent / "videos"
     path.mkdir(parents=True, exist_ok=True)
-    writer = imageio.get_writer(path / "scnn.mp4", fps=30)
+    writer = imageio.get_writer(path / "scnn.mp4", fps=10)
     
     # Initialize SCNN model and load its weights
     model = SCNN(

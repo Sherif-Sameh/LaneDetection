@@ -426,3 +426,7 @@ data/*
 
 # Flax models
 **/weights/*
+
+# Videos
+*.mkv
+*.mp4
