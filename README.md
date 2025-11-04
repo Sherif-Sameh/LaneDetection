@@ -14,9 +14,9 @@ SCNN's implementation is written fully using the **`JAX`** ecosystem with the us
 ## Table of Contents
 
 * [Installation Instructions](#installation-instructions)
-* [Spatial CNN Summary](#behavior-transformer-summary)
+* [Spatial CNN Summary](#spatial-cnn-summary)
     * [Motivation and Overview](#motivation-and-overview)
-    * [Message Passing Mechanism](#action-binning-encoding-and-decoding)
+    * [Message Passing Mechanism](#message-passing-mechanism)
 * [Package Summary](#package-summary)
 * [Examples](#examples)
 * [References](#references)
@@ -139,3 +139,14 @@ The [`classical_tusimple.py`](examples/detectors/classical_tusimple.py) applies 
 </p>
 
 The [`scnn_culane.py`](examples/detectors/scnn_culane.py) applies the SCNN-based detector to the full testing CULane dataset and records a video comparing the model's lane predictions to the ground truth labels as shown in the [`GIF`](images/scnn.gif) above.  **Important**: This script should obviously be run after training the SCNN model or after downloading the pre-trained weights from [`here`](https://drive.google.com/drive/folders/1NlT6E9yVLxpJP-4PyhDQwG2E64lsGz7j?usp=sharing) and storing them inside the [`weights`](lane_detection/models/weights) directory.
+
+
+## References
+
+* The original paper where SCNN was first proposed [`Spatial As Deep: Spatial CNN for Traffic Scene Understanding`](https://arxiv.org/abs/1712.06080).
+
+* [`CULane`](https://www.kaggle.com/datasets/manideep1108/culane) and [`TuSimple`](https://www.kaggle.com/datasets/manideep1108/tusimple) datasets on Kaggle.
+
+* OpenCV [`Hough Line Transform`](https://docs.opencv.org/3.4/d9/db0/tutorial_hough_lines.html).
+
+* [`Flax NNX`](https://flax.readthedocs.io/en/v0.8.3/experimental/nnx/index.html) documentation.
