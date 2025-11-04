@@ -5,13 +5,13 @@ os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = 'false'
 import cv2
 import imageio
 import numpy as np
-import jax.numpy as jnp
 import toml
 from flax import nnx
 from jax import Array
 from numpy.typing import NDArray
 
 from lane_detection.models import SCNN
+from lane_detection.detectors import SCNNLaneDetector
 from lane_detection.utils import convert_transforms
 
 from train_scnn import get_VGG11_backbone, get_dataloader
@@ -86,17 +86,18 @@ def main():
     path.mkdir(parents=True, exist_ok=True)
     writer = imageio.get_writer(path / "scnn.mp4", fps=10)
     
-    # Initialize SCNN model and load its weights
+    # Initialize SCNN model with pre-trained weights
     model = SCNN(
         **config["scnn"], backbone=get_VGG11_backbone(rngs=nnx.Rngs(0)), rngs=nnx.Rngs(0)
     )
     model = model.load()
 
+    # Initialize SCNN lane detector
+    detector = SCNNLaneDetector(model, n_lanes=config["scnn"]["n_lanes"], transform=transform)
+
     # Iterate over testing dataset and store combined images to video
     for input, target in dataloader:
-        input_tf = transform(input)
-        logits = model(input_tf)[0]
-        pred = jnp.argmax(logits, axis=-1)
+        pred = detector.detect_lanes(input)
         writer.append_data(overlay_lane_masks(input[0], pred[0], target[0]))
     
     # Write out video

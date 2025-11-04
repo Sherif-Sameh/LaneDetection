@@ -52,7 +52,7 @@ class SCNNLaneDetector(LaneDetector):
             logits_seg, logits_ext = scnn(images)
             seg_mask = jnp.argmax(logits_seg, axis=-1)
             lane_not_ext = nnx.sigmoid(logits_ext)[:, None, None, :] < 0.5
-            seg_mask = lax.fori_loop(0, self.n_lanes, mask_out_lanes, (seg_mask, lane_not_ext))
+            seg_mask, _ = lax.fori_loop(0, self.n_lanes, mask_out_lanes, (seg_mask, lane_not_ext))
             return seg_mask
         
         images = self.transform(images)
