@@ -1,0 +1,19 @@
+# Configuration for the SCNN-based lane detector
+
+# SCNN model configuration
+[scnn]
+input_size = [288, 800]         # Input image spatial dimensions (H, W)
+out_features = 512              # Number of backbone output features
+ms_kernel_size = 9              # Message passing module's kernel size
+n_lanes = 4                     # Max number of lanes (based on CULane)
+# backbone                      # Feature extractor backbone (None)
+
+
+# Input image transforms 
+[[transform]]
+type = "ToArray"
+[[transform]]
+type = "Normalize"
+[transform.kwargs]
+mean = [0.485, 0.456, 0.406]    # Mean values of ImageNet
+std = [0.229, 0.224, 0.225]     # Std values of ImageNet

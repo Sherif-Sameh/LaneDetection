@@ -10,11 +10,48 @@ from flax import nnx
 from jax import Array
 from numpy.typing import NDArray
 
-from lane_detection.models import SCNN
+from lane_detection.dataloaders import NumPyLaneDataloader
+from lane_detection.datasets import CULaneDataset
+from lane_detection.models import SCNN, VGG11
 from lane_detection.detectors import SCNNLaneDetector
 from lane_detection.utils import convert_transforms
 
-from train_scnn import get_VGG11_backbone, get_dataloader
+
+def get_dataloader(batch_size: int, test: bool = False) -> NumPyLaneDataloader:
+    path = Path(__file__).parents[2] / "data/CULane"
+    dataset = CULaneDataset(path, val=0.0, test=0.1)
+    if not any(path.iterdir()):
+        dataset.download()
+    dataset.load(test=test)
+    dataloader = NumPyLaneDataloader(dataset, batch_size=batch_size, shuffle=(not test))
+    return dataloader
+
+
+def get_VGG11_backbone(*, rngs: nnx.Rngs) -> nnx.List:
+    # Load pre-trained VGG16-BN backbone
+    backbone = VGG11(
+        batch_norm=True, pretrained=True, rngs=nnx.Rngs(0)
+    ).features
+
+    # Replace convolutions in last block with dilated convolutions
+    for i, layer in enumerate(backbone[-1].layers):
+        if not isinstance(layer, nnx.Conv):
+            continue
+        backbone[-1].layers[i] = nnx.Conv(
+            layer.in_features,
+            layer.out_features,
+            kernel_size=(3, 3),
+            padding=(2, 2),
+            kernel_dilation=(2, 2),
+            use_bias=layer.use_bias,
+            rngs=rngs,
+        )
+    
+    # Remove the max pool layers at the end of blocks 4 and 5
+    backbone[-2].layers.pop(-1)
+    backbone[-1].layers.pop(-1)
+    backbone = nnx.Sequential(*backbone)
+    return backbone
 
 
 def overlay_lane_masks(img: Array, pred_mask: Array, gt_mask: Array) -> NDArray:
@@ -76,7 +113,7 @@ def main():
     # Recover training configurations and convert transforms
     path = Path(__file__).parent / "configs/scnn.toml"
     config = toml.load(path)
-    transform = convert_transforms(config["trainer"]["transform"])
+    transform = convert_transforms(config["transform"])
     
     # Get CULane dataloaders for testing dataset
     dataloader = get_dataloader(batch_size=1, test=True)
