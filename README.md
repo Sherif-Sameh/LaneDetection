@@ -81,7 +81,7 @@ $$
 \mathbf{X}^{\prime}_i = \mathbf{X}_i + f\left(\mathbf{K}_{ms} \ast \mathbf{X}_{i-1} \right),
 $$
 
-where $\mathbf{X}_i$ and $\mathbf{X}_{i-1}$ denote the the $i$-th and $(i-1)$-th rows of the feature map respectively, $\mathbf{K}_{ms}$ is the learned 1D convolutional kernel of the message passing layer and $f(\cdot)$ is a non-linear activation function, typically a ReLU activation.
+where $\mathbf{X}\_i$ and $\mathbf{X}\_{i-1}$ denote the the $i$-th and $(i-1)$-th rows of the feature map respectively, $\mathbf{K}_{ms}$ is the learned 1D convolutional kernel of the message passing layer and $f(\cdot)$ is a non-linear activation function, typically a ReLU activation.
 For the top-to-bottom pass, this operation would be applied to all rows except the first since it has nothing before it to attend to.
 However, during the opposite bottom-to-top pass, the first row recieves information propgated from all other rows in the feature map.  
 
